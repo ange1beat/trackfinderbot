@@ -1,3 +1,7 @@
+
+let fs = require('fs');
+const sequelize = require('./db')
+const UserModel = require('./models')
 const TelegramApi = require('node-telegram-bot-api')
 
 
@@ -7,7 +11,7 @@ var dz = new Deezer();
 
 
 
-const token = '5506186121:AAGrM3HDEPRCQ_PKNQ87HZ-1OC0NQp-7q6I'
+const token = '5435769025:AAFbWO_H6NOmuKQlGoe1WlGWbi5Un0_fDXU'
 
 const bot = new TelegramApi(token, {polling: true})
 
@@ -37,20 +41,21 @@ function transliterate(word){
 
 
 
-const {PythonShell} = require('python-shell')
+const {PythonShell} = require('python-shell');
 
 
 
 
 
-let muz
 
 
-////
 
 
-const LastFM = require('last-fm')
-const lastfm = new LastFM('2d4b23228d015d22e8b9b6b93f05f866', { userAgent: 'MyApp/1.0.0 (http://example.com)' })
+//// database
+let msgSendAll
+let userS
+let editSub
+
 
 const menuButtons = {
     reply_markup: JSON.stringify({
@@ -60,6 +65,23 @@ const menuButtons = {
             // [{text: '🌟МОИ ЗАГРУЗКИ🌟', callback_data: 'myDownloads'}],
             // [{text: '🟣ОТКЛЮЧИТЬ РЕКЛАМУ🟣', callback_data: 'donations'}],
             [{text: '❤️КОНТАКТНАЯ ИНФОРМАЦИЯ❤️', callback_data: 'otherBots'}],
+        ]
+    })
+}
+
+const adminPanel = {
+    reply_markup: JSON.stringify({
+        inline_keyboard: [
+            [{text: 'Создать рассылку', callback_data: 'sendAllUsers'}],
+            [{text: 'Настроить обязательную подписку', callback_data: 'nessesarySub'}],
+        ]
+    })
+}
+
+const checkSubs = {
+    reply_markup: JSON.stringify({
+        inline_keyboard: [
+            [{text: 'Проверить подписку', callback_data: 'checkSub'}]
         ]
     })
 }
@@ -99,25 +121,44 @@ let myDownTracks = {
 let myDown2 = []
 
 bot.setMyCommands([
-    {command: '/start', description: 'Если пропала кнопка вызова меню'},
+    {command: '/menu', description: 'Если пропала кнопка вызова меню'},
     // {command: '/inline', description: 'Как использовать Inline'},
 ])
 
 //путь для скачивания
 let albumName = []
 let songName = []
+let channelForSub = '@testmembernodejs'
 
 let albumName2 = []
 let songName2 = []
 ////
 
-const start = () => {
+const start = async () => {
+
+    try {
+        await sequelize.authenticate()
+        await sequelize.sync()
+    } catch (e) {
+        console.log(e)
+    }
+
     bot.on('message', async msg => {
+        msgSendAll = msg.message_id
+        editSub = msg.text
         const text2 = msg.text;
-        let text = transliterate(text2)
+        let text = text2
+        try {
+            text = transliterate(text2)
+        } catch (err) {
+            return console.log('не смог затранслитить')
+        }
+        
         const chatId = msg.chat.id;
+        
     
-        if (text === '/start') {
+        if (text === '/menu') {
+            
             const opts = {
                 reply_markup: {
                     resize_keyboard: true,
@@ -127,8 +168,15 @@ const start = () => {
                     ],
                 }
             };
+            
+            bot.sendMessage(chatId, `Привет! Просто отправь мне название трека и/или имя исполнителя, я буду искать музыку`, opts)
 
-            return bot.sendMessage(chatId, `Привет! Просто отправь мне название трека и/или имя исполнителя, я буду искать музыку`, opts)
+            try {
+                await UserModel.create({chatId})
+            } catch(err) {
+                return console.log('такой пользователь уже существует')
+            }
+
         }
         if (text === '/inline') {
             return bot.sendVideo(chatId, './inlineuse.mp4', {
@@ -144,11 +192,21 @@ const start = () => {
         if (text === '🌟MENYU🌟') {
             return bot.sendMessage(chatId, 'МЕНЮ:', menuButtons)
         }
+        if (text === '/start') {
+            return true
+        }
+
+        //админ панель
+        if (text === '/adminpanel22808808') {
+            userS = await UserModel.findAll()
+            return bot.sendMessage(chatId, 'Добро пожаловать в админ панель!', adminPanel)
+        }
         //отправка музла
         if (text === text) {
             
             dz.findTracks(text).then(function(result) {
                 for (let i = 0; i < 5; i++) {
+                    console.log(result.data[i].link)
                     let numOfSong = String(i)
                     newkeyboard.push([{text: result.data[i].title, callback_data: numOfSong}])
                     linksData.push(result.data[i].link)
@@ -185,7 +243,7 @@ const start = () => {
         //отправка музла
     })
 
-    bot.on('callback_query', msg => {
+    bot.on('callback_query', async msg => {
         const data = msg.data;
         const chatId = msg.message.chat.id;
         const message_id = msg.message.message_id
@@ -202,9 +260,18 @@ const start = () => {
                 });
                 pyshell.end(async function (err,code,signal) {
                     console.log('finished');
-                    await bot.sendAudio(chatId, way, {caption:'🤍@muzBotAngelBeatbot'})
-                    let fs = require('fs');
-                    await fs.rmSync('./'+'musics/'+albumName[i], { recursive: true, force: true });
+                    try {
+                        await bot.sendAudio(chatId, way, {caption:'🤍@Findmusicx_bot'})
+                    } catch(err) {
+                        bot.sendMessage(chatId, 'Не удалось найти аудиофайл :C')
+                        return console.log(err)
+                    }
+                    
+                    try {
+                        await fs.rmSync('./'+'musics/'+albumName[i], { recursive: true, force: true });
+                    } catch(err) {
+                        return console.log(err)
+                    }
                   });
                 
                 // bot.answerCallbackQuery(msg.id, '⏳Идет скачивание...')
@@ -235,6 +302,18 @@ const start = () => {
                 }
             })
         }
+        if (data === 'sendAllUsers') {
+            console.log(msgSendAll)
+            for (let i = 0; i < userS.length; i++) {
+                console.log(userS[i].chatId)
+                bot.forwardMessage(userS[i].chatId, chatId, msgSendAll)
+            }
+            msgSendAll = null
+            return console.log('рассылка завершена корректно')
+        }
+        if (data === 'nessesarySub') {
+            channelForSub = editSub
+        }
     })
 
     // bot.on('inline_query', query => {
@@ -255,4 +334,40 @@ const start = () => {
     // })
 }
 
-start()
+
+let xtest 
+let start2 = async () => {
+    bot.on('message', async msg => {
+        let schatId = msg.chat.id
+        let sText = msg.text
+        xtest = msg.from.id
+
+        if (sText === '/start') {
+            return bot.sendMessage(schatId, `Привет, подпишись на канал чтобы пользоваться ботом ${channelForSub}`, checkSubs)
+        }
+        
+    })
+
+    bot.on('callback_query', async msg => {
+        const sdata = msg.data;
+        const schatId = msg.message.chat.id;
+
+        if (sdata === 'checkSub') {
+            try {
+                let chatMem = await bot.getChatMember(channelForSub, xtest)
+                if (chatMem.status == 'member') {
+                    console.log('member acess')
+                    bot.sendMessage(schatId, 'Теперь можете пользоваться ботом! /menu - чтобы открыть меню')
+                    start()
+                }
+                else {
+                    bot.sendMessage(schatId, 'Ты не подписался!')
+                }
+            } catch (err) {
+                console.log('не получилось проверить подписку')
+            } 
+        }
+    })
+}
+
+start2()
