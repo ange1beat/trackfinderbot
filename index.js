@@ -345,7 +345,7 @@ let start2 = async () => {
         if (sText === '/start') {
             return bot.sendMessage(schatId, `Привет, подпишись на канал чтобы пользоваться ботом ${channelForSub}`, checkSubs)
         }
-        
+        return console.log('ok')
     })
 
     bot.on('callback_query', async msg => {
@@ -358,16 +358,17 @@ let start2 = async () => {
                 if (chatMem.status == 'member') {
                     console.log('member acess')
                     bot.sendMessage(schatId, 'Теперь можете пользоваться ботом! /menu - чтобы открыть меню')
-                    start()
+                    return start()
                 }
                 else {
-                    bot.sendMessage(schatId, 'Ты не подписался!')
+                    return bot.sendMessage(schatId, 'Ты не подписался!')
                 }
             } catch (err) {
-                console.log('не получилось проверить подписку')
+                return console.log('не получилось проверить подписку')
             } 
         }
     })
+  return console.log('ok')
 }
 
 start2()
